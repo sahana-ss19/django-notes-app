@@ -1,29 +1,42 @@
-@Library('Shared')_
 pipeline{
-    agent { label 'dev-server'}
-    
-    stages{
-        stage("Code clone"){
-            steps{
-                sh "whoami"
-            clone("https://github.com/LondheShubham153/django-notes-app.git","main")
-            }
-        }
-        stage("Code Build"){
-            steps{
-            dockerbuild("notes-app","latest")
-            }
-        }
-        stage("Push to DockerHub"){
-            steps{
-                dockerpush("dockerHubCreds","notes-app","latest")
-            }
-        }
-        stage("Deploy"){
-            steps{
-                deploy()
-            }
-        }
-        
-    }
-}
+	    agent any
+	    stages{
+	        stage("CLONE"){
+	            steps{
+	                echo " code clone"
+	                git url : "https://github.com/sahana-ss19/django-notes-app.git", branch: "main"
+	                echo "code clone successful"
+	            }
+	        }
+	        stage("BUILD"){
+	            steps{
+	                echo "building the code"
+	                sh "docker build -t notes-app:latest ."
+	                echo "docker image build successfull"
+	            }
+	        }
+	        stage("PUSH"){
+	            steps{
+	                echo "pushing the code"
+	                   withCredentials([usernamePassword(
+	                    credentialsId: 'dockerHub',
+	                    usernameVariable: 'DockerHubUser',
+	                    passwordVariable: 'DockerHubPass'
+	                )]) {
+	                    sh """
+	                    echo ${DockerHubPass} | docker login -u ${DockerHubUser} --password-stdin
+	                    docker tag notes-app:latest ${DockerHubUser}/notes-app:latest
+	                    docker push ${DockerHubUser}/notes-app:latest
+	                    """
+	                }
+	            }
+	        }
+	        stage("DEPLOY"){
+	            steps{
+	                echo "deploying the code"
+	                sh "docker run -d -p 8000:8000 --name note-app-cont notes-app:latest"
+	                echo "deployment successfull"
+	            }
+	        }
+	    }
+	}
